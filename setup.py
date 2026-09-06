@@ -47,9 +47,13 @@ for s in sources + zlib_sources:
 # alongside a C++ extension (e.g. Pillow, psycopg2).
 # build_clib doesn't add -fPIC by default on Unix, which a static lib needs
 # to be linkable into a shared extension module (not an issue on Windows).
+# -UTARGET_OS_MAC/-UMACOS: Apple clang predefines TARGET_OS_MAC, but this
+# vendored zconf.h (~2005-era zlib) uses that exact macro to mean "building
+# for classic Mac OS" and skips its own `Byte` typedef when it's set --
+# breaking the build on modern Apple toolchains. Force it undefined.
 zlib_build_info = dict(sources=zlib_sources)
 if os.name != 'nt':
-    zlib_build_info['cflags'] = ['-fPIC']
+    zlib_build_info['cflags'] = ['-fPIC', '-UTARGET_OS_MAC', '-UMACOS']
 
 libraries = [('readim_zlib', zlib_build_info)]
 
