@@ -1,0 +1,11 @@
+.venv/
+build/
+dist/
+wheelhouse/
+*.egg-info/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.so
+*.pyd
+*.dll

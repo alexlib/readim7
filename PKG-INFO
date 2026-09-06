@@ -1,0 +1,94 @@
+Metadata-Version: 2.1
+Name: ReadIM
+Version: 0.8.4
+Summary: Read and write native DaVis images and vectors filetypes VC7 and IM7
+Home-page: https://bitbucket.org/fleming79/readim
+License: MIT
+Description: Overview
+        ========
+        
+        ReadIM is a C++ wrapper to load DaVis Images and Vectors and is a 'low level' wrapper of C++ libraries provided by LaVision GMBH.
+        ReadIMX source was latest updated by LaVision in Aug-2014.
+        
+        A higher level module: "[IM](https://bitbucket.org/fleming79/im)" exists to work with images and vectors. It isn't hosted on PyPi however it can still be installed with pip. It provides more convenient file read / write capability and is the recommended starting point to read and write IM7/VC7 files.
+        
+        Installation
+        ------------
+        
+        This module must be compiled to work correctly. If there isn't a binary on pip you'll need to have the appropriate build tools installed for it to compile and install properly.
+        
+        ```python
+        pip install ReadIM
+        ```
+        
+        Usage
+        -----
+        
+        To load a .vc7 file run
+        
+        ```python
+        import ReadIM
+        filename = ReadIM.extra.get_sample_vector_filenames()[0]
+        buffer, atts   =  ReadIM.extra.get_Buffer_andAttributeList(filename)
+        v_array, _ = ReadIM.extra.buffer_as_array(buffer)
+        v_array.shape
+        del(v_array)    # Required
+        ReadIM.DestroyBuffer(buffer)
+        ReadIM.DestroyAttributeListSafe(atts)
+        ```
+        
+        similarly for a .im7 file run
+        
+        ```python
+        import ReadIM
+        filename = ReadIM.extra.get_sample_image_filenames()[0]
+        buffer, atts   =  ReadIM.extra.get_Buffer_andAttributeList(filename)
+        im_array, _ = ReadIM.extra.buffer_as_array(buffer)
+        im_array.shape
+        del(im_array)   # Required
+        ReadIM.DestroyBuffer(buffer)
+        ReadIM.DestroyAttributeListSafe(atts)
+        ```
+        
+        Writing files
+        -------------
+        
+        (requires existing buffer and atts first)
+        
+        ```python
+        atts = ReadIM.load_AttributeList({'attribute':'value'})
+        ReadIM.WriteIM7('saved_file.im7', True, buffer, atts.next)
+        ```
+        
+        Memory leaks
+        -------------
+        
+        Memory cleanup of the buffer and attribute list is not automatic. Both the buffer and attribute list must be destroyed manually. All
+        references to the buffer and attributes should be removed before attempting to destroy the memory, failing to do so will crash python.
+        
+        ```python
+        del(im_array)
+        ReadIM.DestroyBuffer(buffer)
+        ReadIM.DestroyAttributeListSafe(atts)
+        ```
+        
+        VC7 files
+        ---------
+        
+        Depending on the filetype, there could be several frames that make up the optimal vector field as decided by DaVis. For a full description of the buffer you should contact LaVision support. Below is a link for some code snippets. The higher level "[IM](https://bitbucket.org/fleming79/im)" automatically reads the optimal result.
+        
+        see the function "_get_vectors" at https://bitbucket.org/fleming79/im/src/master/IM/core.py
+        
+        
+Keywords: IM7 VC7 DaVis LaVision FileIO PIV
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Software Development :: Build Tools
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3.4
+Classifier: Programming Language :: Python :: 3.5
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Description-Content-Type: text/markdown

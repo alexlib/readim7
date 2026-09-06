@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61", "wheel", "pybind11>=2.10"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ReadIM"
+version = "0.9.0"
+description = "Read and write native DaVis images and vectors filetypes VC7 and IM7"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = ["numpy"]
+
+[tool.cibuildwheel]
+# pure C++ extension, no external deps beyond numpy (installed from PyPI wheels)
+build = "cp311-* cp312-* cp313-* cp314-*"
+skip = "*-musllinux* *_i686 pp*"
+test-command = "python -c \"import ReadIM; f=ReadIM.get_sample_image_filenames()[0]; b,a=ReadIM.get_Buffer_andAttributeList(f); arr,_=ReadIM.buffer_as_array(b); print(arr.shape)\""
