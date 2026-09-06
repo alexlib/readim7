@@ -44,7 +44,10 @@ ext_modules = [
         'ReadIM._core',
         sources=sources,
         include_dirs=['ReadIM/src'],
-        cxx_std=11,
+        # No explicit cxx_std: it would apply -std=c++11 to every source in
+        # this extension, including the vendored zlib .c files, and Apple
+        # clang rejects a C++ std flag on a C compile unit. Compilers'
+        # C++14+ defaults are already enough for this binding.
     ),
 ]
 
