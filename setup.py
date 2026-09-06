@@ -45,7 +45,13 @@ for s in sources + zlib_sources:
 # separate static library with the plain C compiler, then link the pybind11
 # extension against it -- the standard pattern for bundling a C library
 # alongside a C++ extension (e.g. Pillow, psycopg2).
-libraries = [('readim_zlib', dict(sources=zlib_sources))]
+# build_clib doesn't add -fPIC by default on Unix, which a static lib needs
+# to be linkable into a shared extension module (not an issue on Windows).
+zlib_build_info = dict(sources=zlib_sources)
+if os.name != 'nt':
+    zlib_build_info['cflags'] = ['-fPIC']
+
+libraries = [('readim_zlib', zlib_build_info)]
 
 ext_modules = [
     Pybind11Extension(
