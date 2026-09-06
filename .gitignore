@@ -2,6 +2,7 @@
 build/
 dist/
 wheelhouse/
+PKG-INFO
 *.egg-info/
 __pycache__/
 *.pyc

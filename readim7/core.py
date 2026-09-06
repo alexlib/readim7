@@ -1,6 +1,6 @@
 """
 Thin re-export of the pybind11 `_core` extension (read_file/write_file plus
-the IMREAD_ERR_*/BUFFER_FORMAT_* constants). See ReadIM.extra for the
+the IMREAD_ERR_*/BUFFER_FORMAT_* constants). See readim7.extra for the
 friendly wrappers.
 """
 from __future__ import division, print_function, absolute_import

@@ -127,7 +127,7 @@ def get_Buffer_andAttributeList(filename):
 
     Notes
     -----
-        Unlike older versions of ReadIM there is nothing to destroy manually:
+        Unlike older versions of readim7 (ReadIM) there is nothing to destroy manually:
         the C buffer is copied into numpy arrays and freed before this
         function returns.
     """

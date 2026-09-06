@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 """
-setup.py for ReadIM
+setup.py for readim7
 
-Builds ReadIM._core, a pybind11 extension wrapping LaVision's ReadIMX/ReadIM7
+Builds readim7._core, a pybind11 extension wrapping LaVision's ReadIMX/ReadIM7
 C++ file readers.
 
     python -m build            # sdist + wheel
@@ -20,7 +20,7 @@ update version info below, then
     twine upload dist/*
 """
 
-version = '0.9.0'
+version = '0.9.1'
 
 import io
 import os
@@ -33,9 +33,9 @@ here = os.path.abspath(os.path.dirname(__file__))
 zlib_sources = ['adler32.c', 'compress.c', 'deflate.c', 'infblock.c',
                  'infcodes.c', 'inffast.c', 'inflate.c', 'infutil.c',
                  'inftrees.c', 'trees.c', 'uncompr.c', 'zutil.c']
-zlib_sources = ['ReadIM/src/zlib/' + s for s in zlib_sources]
+zlib_sources = ['readim7/src/zlib/' + s for s in zlib_sources]
 
-sources = ['ReadIM/src/pybind_core.cpp', 'ReadIM/src/ReadIMX.cpp', 'ReadIM/src/ReadIM7.cpp']
+sources = ['readim7/src/pybind_core.cpp', 'readim7/src/ReadIMX.cpp', 'readim7/src/ReadIM7.cpp']
 for s in sources + zlib_sources:
     assert os.path.isfile(s), s
 
@@ -59,9 +59,9 @@ libraries = [('readim_zlib', zlib_build_info)]
 
 ext_modules = [
     Pybind11Extension(
-        'ReadIM._core',
+        'readim7._core',
         sources=sources,
-        include_dirs=['ReadIM/src'],
+        include_dirs=['readim7/src'],
         libraries=['readim_zlib'],
     ),
 ]
@@ -74,15 +74,15 @@ except IOError:
     long_description = description
 
 setup(
-    name='ReadIM',
+    name='readim7',
     description=description,
     version=version,
-    url='https://bitbucket.org/fleming79/readim',
+    url='https://github.com/alexlib/readim7',
     libraries=libraries,
     ext_modules=ext_modules,
     cmdclass={'build_ext': build_ext},
-    packages=['ReadIM'],
-    package_data={'ReadIM': ['sample_files/*.*']},
+    packages=['readim7'],
+    package_data={'readim7': ['sample_files/*.*']},
     include_package_data=True,
     install_requires=['numpy'],
     setup_requires=['pybind11>=2.10'],
