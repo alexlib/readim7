@@ -33,21 +33,26 @@ here = os.path.abspath(os.path.dirname(__file__))
 zlib_sources = ['adler32.c', 'compress.c', 'deflate.c', 'infblock.c',
                  'infcodes.c', 'inffast.c', 'inflate.c', 'infutil.c',
                  'inftrees.c', 'trees.c', 'uncompr.c', 'zutil.c']
+zlib_sources = ['ReadIM/src/zlib/' + s for s in zlib_sources]
 
 sources = ['ReadIM/src/pybind_core.cpp', 'ReadIM/src/ReadIMX.cpp', 'ReadIM/src/ReadIM7.cpp']
-sources += ['ReadIM/src/zlib/' + s for s in zlib_sources]
-for s in sources:
+for s in sources + zlib_sources:
     assert os.path.isfile(s), s
+
+# The vendored zlib sources are plain C and must be compiled without a C++
+# std flag (Apple clang errors out if one is passed to a .c file, and
+# Pybind11Extension always adds one for its own sources). Build them as a
+# separate static library with the plain C compiler, then link the pybind11
+# extension against it -- the standard pattern for bundling a C library
+# alongside a C++ extension (e.g. Pillow, psycopg2).
+libraries = [('readim_zlib', dict(sources=zlib_sources))]
 
 ext_modules = [
     Pybind11Extension(
         'ReadIM._core',
         sources=sources,
         include_dirs=['ReadIM/src'],
-        # No explicit cxx_std: it would apply -std=c++11 to every source in
-        # this extension, including the vendored zlib .c files, and Apple
-        # clang rejects a C++ std flag on a C compile unit. Compilers'
-        # C++14+ defaults are already enough for this binding.
+        libraries=['readim_zlib'],
     ),
 ]
 
@@ -63,6 +68,7 @@ setup(
     description=description,
     version=version,
     url='https://bitbucket.org/fleming79/readim',
+    libraries=libraries,
     ext_modules=ext_modules,
     cmdclass={'build_ext': build_ext},
     packages=['ReadIM'],
