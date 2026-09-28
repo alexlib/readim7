@@ -83,3 +83,54 @@ Depending on the filetype, there could be several frames that make up the optima
 
 see the function "_get_vectors" at https://bitbucket.org/fleming79/im/src/master/IM/core.py
 
+
+Interactive Viewers
+-------------------
+
+`readim7` includes two ultra-fast viewers for previewing `.ims` streams, `.im7` image sequences, and `.vc7` vector fields:
+
+### 1. Ultra-fast Standalone OpenGL Viewer (`readim7-view`)
+A lightweight, sub-second launch desktop viewer built on Dear PyGui (hardware-accelerated OpenGL):
+- **Smooth playback & scrubbing** (up to 60+ FPS directly from memory-mapped files)
+- **Mouse pan & scroll-wheel zoom**
+- **Pulse A / Pulse B & vector component selection**
+- **Auto-contrast windowing** and scientific colormaps (Viridis, Turbo, Plasma, Inferno, Grayscale)
+- **Keyboard shortcuts**:
+  - `Space`: Play / Pause
+  - `Left` / `Right`: Previous / Next frame
+  - `A` / `B`: Toggle Pulse A / Pulse B
+  - `C`: Auto-contrast
+  - `R`: Reset pan & zoom
+
+```bash
+# Install optional viewer dependencies
+pip install "readim7[viewer]"
+
+# Launch directly with a file or folder:
+readim7-view /path/to/Camera1-1.ims
+readim7-view /path/to/run_folder/
+readim7-view /path/to/image.im7
+```
+
+### 2. Reactive Marimo Viewer (`readim7-marimo`)
+A notebook-ready reactive web app using [Marimo](https://marimo.io):
+- Interactive scrubbing slider, pulse/channel toggle, contrast range slider, colormap picker, and dataset metadata inspector.
+- Runs in browser or inside notebooks:
+
+```bash
+readim7-marimo /path/to/file.ims
+# or with marimo directly:
+marimo run readim7/viewer/marimo_app.py
+```
+
+### 3. macOS Finder Integration (Quick Action & App Droplet)
+To open files directly from macOS Finder:
+
+```bash
+readim7-finder-action
+```
+
+This installs:
+1. **Finder Quick Action**: Right-click any `.ims`, `.im7`, `.vc7` file or folder in Finder -> **Quick Actions** -> **Open with readim7-view**.
+2. **Droplet App (`~/Applications/readim7 Viewer.app`)**: Drag and drop files/folders onto the app icon, or use Finder's **Open With...** menu.
+

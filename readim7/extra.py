@@ -276,6 +276,6 @@ def get_sample_image_filenames():
     return glob.glob(ptn)
 
 def get_sample_vector_filenames():
-    ptn = get_sample_folder()
-    ptn = os.path.join(ptn, '*.vc7')
-    return glob.glob(ptn)
+    folder = get_sample_folder()
+    return sorted(glob.glob(os.path.join(folder, '*.[vV][cC]7')))
+

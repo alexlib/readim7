@@ -11,6 +11,18 @@ license = { text = "MIT" }
 requires-python = ">=3.11"
 dependencies = ["numpy"]
 
+[project.optional-dependencies]
+viewer = [
+    "dearpygui>=2.0.0",
+    "marimo>=0.10.0",
+    "pillow>=10.0.0",
+]
+
+[project.scripts]
+readim7-view = "readim7.viewer.standalone:main"
+readim7-marimo = "readim7.viewer.marimo_app:main"
+readim7-finder-action = "readim7.viewer.mac_action:main"
+
 [tool.cibuildwheel]
 # pure C++ extension, no external deps beyond numpy (installed from PyPI wheels)
 build = "cp311-* cp312-* cp313-* cp314-*"
