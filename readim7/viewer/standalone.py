@@ -130,8 +130,8 @@ class StandaloneViewer:
         self._setup_texture()
         self._update_frame_data(reset_contrast=True)
 
-    def run(self):
-        """Launch the viewer window and run event loop."""
+    def setup_ui(self):
+        """Construct Dear PyGui window layout and textures."""
         dpg.create_context()
         dpg.create_viewport(
             title=f"readim7 viewer - {self.dataset.title}",
@@ -287,7 +287,7 @@ class StandaloneViewer:
                 height=-30,
                 width=-1,
                 equal_aspects=True,
-                flags=dpg.mvPlotFlags_NoTitle | dpg.mvPlotFlags_NoLegend,
+                no_title=True,
             ):
                 dpg.add_plot_axis(dpg.mvXAxis, label="X [pixels]", tag=self.xaxis_tag)
                 dpg.add_plot_axis(dpg.mvYAxis, label="Y [pixels]", tag=self.yaxis_tag)
@@ -335,6 +335,9 @@ class StandaloneViewer:
         self._setup_texture()
         self._update_frame_data(reset_contrast=True)
 
+    def run(self):
+        """Launch the viewer window and run event loop."""
+        self.setup_ui()
         dpg.show_viewport()
 
         # Render loop with smooth playback

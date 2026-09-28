@@ -107,6 +107,12 @@ def test_standalone_viewer_init():
     assert viewer.current_frame == 0
     assert viewer.colormap == "gray"
 
+    # Verify full UI setup and texture generation
+    viewer.setup_ui()
+    assert dpg.does_item_exist("main_window")
+    assert dpg.does_item_exist(viewer.tex_tag)
+    dpg.destroy_context()
+
 
 def test_marimo_app_importable():
     from readim7.viewer.marimo_app import app
