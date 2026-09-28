@@ -46,6 +46,27 @@ im_array.shape
 `buffer` and `atts` are plain Python objects (a `BunchMappable` wrapping numpy
 arrays, and a `dict`) — nothing needs to be destroyed manually.
 
+DaVis camera streams (.ims)
+----------------------------
+
+High-speed streaming files (`.ims`) use a different container that the
+ReadIMX C++ library cannot parse. `readim7.ims` reads them directly with
+numpy (12-bit packed frames, no headers), so it works on every platform —
+including macOS ARM, where `lvpyio` has no wheels:
+
+```python
+import readim7
+info = readim7.ims_info('/path/to/run_folder')  # or .../Camera1-1.ims directly
+# {'ims_path': ..., 'n_pairs': 1000, 'nx': 2432, 'ny': 2048, ...}
+pulse_a, pulse_b = readim7.read_ims_pair(info, 0)  # uint16 (ny, nx) frames
+frame_b = readim7.read_ims_frame(info, 42, pulse=1)
+```
+
+The run folder normally holds the large stream file (`Camera1-1.ims`) plus a
+small index sibling (`Camera1-0.ims`, 1024-byte header + 40 bytes per pair)
+that provides the sensor geometry. If the index is missing, pass the
+geometry explicitly: `readim7.ims_info(stream, nx=2432, ny=2048)`.
+
 Writing files
 -------------
 

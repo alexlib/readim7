@@ -14,6 +14,7 @@ from __future__ import division, print_function, absolute_import
 
 from . import core
 from . import extra
+from . import ims
 
 # collect buffer formats together
 BUFFER_FORMATS = {}
@@ -30,5 +31,7 @@ for s in dir(core):
 del(s)
 
 from .core import read_file, write_file, get_vector_components
+
+from .ims import ims_info, read_ims_pair, read_ims_frame
 
 from .extra import *
