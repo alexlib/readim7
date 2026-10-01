@@ -17,6 +17,19 @@ viewer = [
     "marimo>=0.10.0",
     "pillow>=10.0.0",
 ]
+analysis = [
+    "xarray>=2024.1.0",
+    "scipy>=1.10.0",
+    "h5py>=3.8.0",
+]
+all = [
+    "dearpygui>=2.0.0",
+    "marimo>=0.10.0",
+    "pillow>=10.0.0",
+    "xarray>=2024.1.0",
+    "scipy>=1.10.0",
+    "h5py>=3.8.0",
+]
 
 [project.scripts]
 readim7-view = "readim7.viewer.standalone:main"

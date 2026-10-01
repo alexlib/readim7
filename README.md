@@ -76,12 +76,90 @@ buff.array[...] = v_array   # fill in your data
 readim7.WriteIM7('saved_file.im7', buff, {'attribute': 'value'})
 ```
 
-VC7 files
----------
+VC7 Vector Files & PIVPy / OpenPIV Bridge
+----------------------------------------
 
-Depending on the filetype, there could be several frames that make up the optimal vector field as decided by DaVis. For a full description of the buffer you should contact LaVision support. Below is a link for some code snippets. The higher level "[IM](https://bitbucket.org/fleming79/im)" automatically reads the optimal result.
+`readim7` provides full, high-level integration with the **PIVPy** and **OpenPIV** ecosystems:
 
-see the function "_get_vectors" at https://bitbucket.org/fleming79/im/src/master/IM/core.py
+### 1. Direct one-liner into PIVPy (`xarray.Dataset`)
+Convert `.vc7` or `.im7` files directly into an `xarray.Dataset` compliant with PIVPy:
+
+```python
+import readim7
+
+# Convert VC7 to PIVPy dataset
+ds = readim7.to_pivpy("B00001.VC7")   # or readim7.to_dataset(...)
+
+# Standard PIVPy variables (u, v, w, ch, p, mask) and coordinates (x, y, t):
+print(ds)
+# <xarray.Dataset>
+# Dimensions:  (t: 1, y: 43, x: 57)
+# Coordinates:
+#   * x  (x) float64 -143.6 ... 193.3 (mm)
+#   * y  (y) float64 -324.8 ... -72.1 (mm)
+#   * t  (t) int64 0
+# Data variables:
+#     u     (t, y, x) float32 ... (m/s)
+#     v     (t, y, x) float32 ... (m/s)
+#     ch    (t, y, x) int32   ... (choice map: 1-4 peak, 5 post-processed)
+#     mask  (t, y, x) int8    ... (1=masked, 0=valid)
+
+# Load an entire sequence into a time-resolved dataset:
+seq_ds = readim7.load_sequence(["B00001.VC7", "B00002.VC7", "B00003.VC7"])
+```
+
+### 2. Standalone Vector Field Unpacking
+If you prefer pure NumPy without xarray:
+
+```python
+vf = readim7.unpack_vector_field("B00001.VC7")
+print(vf.u.shape, vf.x.shape, vf.y.shape)
+print("Velocity magnitude:", vf.vmag)
+print("Physical extent [xmin, xmax, ymin, ymax]:", vf.extent)
+```
+
+Universal Exporters & Interoperability
+--------------------------------------
+
+Export vector fields directly to standard fluid dynamics and post-processing tools:
+
+```python
+# 1. PIVMAT (.mat) for MATLAB PIV toolbox
+readim7.export_pivmat("field.mat", ds)
+
+# 2. Tecplot ASCII (.dat) for CFD, Tecplot, and ParaView
+readim7.export_tecplot("field.dat", ds)
+
+# 3. Hierarchical HDF5 (.h5) with compressed datasets & metadata
+readim7.export_hdf5("field.h5", ds)
+
+# 4. OpenPIV ASCII (.txt) 5-column format (x, y, u, v, mask)
+readim7.export_openpiv_txt("field.txt", ds)
+```
+
+Vector Field Transforms & Fluid Mechanics
+-----------------------------------------
+
+Perform pure, coordinate-consistent transforms and spatial derivations:
+
+```python
+# Geometric transforms (consistently transforms x, y and u, v):
+ds_rot = readim7.rotate_90_cw(ds)
+ds_flip = readim7.flip_ud(ds)
+ds_piped = readim7.transform(ds, ['flip_lr', 'rotate_90_cw', 'scale_velocity:1000'])
+
+# Spatial derivatives:
+vorticity = readim7.calc_vorticity(ds)       # omega_z = dv/dx - du/dy
+divergence = readim7.calc_divergence(ds)     # div = du/dx + dv/dy
+shear_strain = readim7.calc_shear_strain(ds) # 0.5 * (du/dy + dv/dx)
+
+# Westerweel & Scarano Normalized Median Test (Universal Outlier Detection):
+outliers = readim7.normalized_median_filter(vf.u, vf.v, threshold=2.0)
+
+# Reynolds stresses and Turbulent Kinetic Energy across time series:
+stats = readim7.calc_turbulent_statistics(seq_ds)
+print(stats['uu'], stats['uv'], stats['tke'])
+```
 
 
 Interactive Viewers
