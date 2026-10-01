@@ -11,6 +11,23 @@ repackaged as `readim7` with pybind11-based bindings and prebuilt binary wheels.
 
 A higher level module: "[IM](https://bitbucket.org/fleming79/im)" exists to work with images and vectors. It isn't hosted on PyPi however it can still be installed with pip. It provides more convenient file read / write capability and is the recommended starting point to read and write IM7/VC7 files.
 
+Why readim7? Feature Comparison
+-------------------------------
+
+| Capability | Official `lvpyio` | Legacy `libim7-py3` / `IM` | `pyFlowStat` / `PIVTOOLs` | **`readim7`** |
+| :--- | :---: | :---: | :---: | :---: |
+| **Platform Portability** | Closed binary, **no macOS ARM** | Fragile ctypes / Python 2 | Incomplete reader bindings | **Linux, Windows & macOS (native ARM64 + x86)** |
+| **All Vector Formats** (2D, 3D, Multi-Peak Choice 1..5) | Partial | 2D / basic only | Basic | **All 5 DaVis formats + full choice map** |
+| **All Image Formats** (Int16, Float32, Zipped, Multi-camera) | Yes | Partial | Partial | **Tested & verified on all types** |
+| **High-Speed `.ims` Streams** | Windows only / C++ library | No | No | **Native pure-NumPy 12-bit reader** |
+| **PIVPy Bridge** (`xarray.Dataset`, `ds.piv`) | No | No | No | **Native 1-liner (`readim7.to_pivpy`)** |
+| **OpenPIV Image Pair Reader** | No | No | No | **`readim7.read_image_pair`** |
+| **Sequence Loading & Dask Chunking** | No | Manual loops | Custom scripts | **Natural numerical sort + lazy Dask** |
+| **Exporters** (PIVMAT, Tecplot, HDF5, OpenPIV) | No | PIVMAT only | Custom HDF5/Tecplot | **All 4 universal formats built-in** |
+| **Flow Calculus & Outlier Validation** | No | No | Custom scripts | **Vorticity, divergence, TKE, Westerweel test** |
+| **Interactive GUI Viewers** | No | No | No | **Hardware-accelerated OpenGL + Marimo + macOS Finder Quick Action** |
+
+
 Installation
 ------------
 
