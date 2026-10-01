@@ -8,8 +8,11 @@ directly into standard xarray.Dataset structures fully compliant with PIVPy and 
 
 from __future__ import annotations
 
+import glob
 import os
-from typing import Any, Dict, List, Optional, Sequence, Union
+import re
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 import numpy as np
 
 try:
@@ -20,13 +23,84 @@ except ImportError:
     HAS_XARRAY = False
 
 from .vectors import unpack_vector_field, VectorField
+from .attributes import parse_davis_attributes, parse_time_value
 from . import extra
 from . import ims
 
 
+def _natural_sort_key(s: str) -> List[Union[int, str]]:
+    """Helper for natural alphanumeric sorting (e.g. B1, B2, ..., B10)."""
+    return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', str(s))]
+
+
+def read_image_pair(
+    source: Union[str, Path, Any],
+    pair_idx: int = 0,
+    camera: int = 0,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Read a PIV double-frame image pair (frame_a, frame_b) for OpenPIV / PIV processing.
+
+    Works with multi-frame .im7 files and high-speed .ims stream files.
+
+    Parameters
+    ----------
+    source : str | Path | dict
+        Path to .im7 file, .ims file, or .ims run folder, or an ims_info dict.
+    pair_idx : int
+        Index of the pair to read (for .ims streams). Default: 0.
+    camera : int
+        Camera index (for multi-camera stereoscopic .im7 files with 4 frames). Default: 0.
+
+    Returns
+    -------
+    frame_a : np.ndarray (ny, nx)
+        First pulse/exposure image.
+    frame_b : np.ndarray (ny, nx)
+        Second pulse/exposure image.
+    """
+    if isinstance(source, (str, Path)):
+        source_str = str(source)
+        lower = source_str.lower()
+        if lower.endswith('.im7'):
+            buff, _ = extra.get_Buffer_andAttributeList(source_str)
+            arr, _ = extra.buffer_as_array(buff)
+            nf = arr.shape[0]
+
+            if nf == 1:
+                raise ValueError(f"File '{source_str}' has only 1 frame; expected a double-frame pair.")
+            elif nf == 2:
+                return arr[0], arr[1]
+            elif nf >= 4:
+                idx_a = camera * 2
+                idx_b = camera * 2 + 1
+                if idx_b >= nf:
+                    raise IndexError(f"Camera index {camera} out of range for {nf}-frame buffer.")
+                return arr[idx_a], arr[idx_b]
+            else:
+                return arr[0], arr[1]
+
+        elif lower.endswith('.ims') or os.path.isdir(source_str):
+            info = ims.ims_info(source_str)
+            return ims.read_ims_pair(info, pair_idx)
+
+    elif isinstance(source, dict) and 'ims_path' in source:
+        return ims.read_ims_pair(source, pair_idx)
+
+    # If already a buffer object
+    if hasattr(source, 'array') and hasattr(source, 'nf'):
+        arr, _ = extra.buffer_as_array(source)
+        if arr.shape[0] >= 2:
+            idx_a = camera * 2
+            idx_b = camera * 2 + 1
+            return arr[idx_a], arr[idx_b]
+
+    raise TypeError(f"Unsupported source type for read_image_pair: {type(source)}")
+
+
 def to_dataset(
-    source: Union[str, VectorField, Any],
-    t: Optional[Union[float, int]] = 0,
+    source: Union[str, Path, VectorField, Any],
+    t: Optional[Union[float, int]] = None,
     choice_preference: str = "optimal",
     invert_y: bool = True,
     fill_invalid_with_nan: bool = True,
@@ -36,12 +110,12 @@ def to_dataset(
 
     Parameters
     ----------
-    source : str | VectorField | BunchMappable
+    source : str | Path | VectorField | BunchMappable
         Path to .vc7, .im7 file or folder with .ims stream, or an unpacked VectorField.
     t : float | int, optional
-        Time stamp or frame index for the time coordinate (default: 0).
+        Time stamp or frame index for the time coordinate. If None, derived from DaVis attributes.
     choice_preference : str
-        'optimal' or 'first' for vector choice selection.
+        'optimal' (default) or 'first' for vector choice selection.
     invert_y : bool
         If True, adjust y coordinate and v sign so y increases upwards.
     fill_invalid_with_nan : bool
@@ -62,29 +136,29 @@ def to_dataset(
     if isinstance(source, VectorField):
         return _vectorfield_to_dataset(source, t=t)
 
-    if isinstance(source, str):
-        lower = source.lower()
+    if isinstance(source, (str, Path)):
+        source_str = str(source)
+        lower = source_str.lower()
         if lower.endswith(('.vc7', '.vec')):
             vf = unpack_vector_field(
-                source,
+                source_str,
                 choice_preference=choice_preference,
                 invert_y=invert_y,
                 fill_invalid_with_nan=fill_invalid_with_nan,
             )
             ds = _vectorfield_to_dataset(vf, t=t)
-            ds.attrs['source'] = os.path.abspath(source)
+            ds.attrs['source'] = os.path.abspath(source_str)
             return ds
 
         elif lower.endswith('.im7'):
-            return _im7_to_dataset(source, t=t)
+            return _im7_to_dataset(source_str, t=t)
 
-        elif lower.endswith('.ims') or os.path.isdir(source):
-            return _ims_to_dataset(source)
+        elif lower.endswith('.ims') or os.path.isdir(source_str):
+            return _ims_to_dataset(source_str)
 
         else:
-            # Try loading as vector first, fall back to buffer
             try:
-                buff, atts = extra.get_Buffer_andAttributeList(source)
+                buff, atts = extra.get_Buffer_andAttributeList(source_str)
                 if buff.image_sub_type > 0:
                     vf = unpack_vector_field(
                         buff,
@@ -94,12 +168,12 @@ def to_dataset(
                         fill_invalid_with_nan=fill_invalid_with_nan,
                     )
                     ds = _vectorfield_to_dataset(vf, t=t)
-                    ds.attrs['source'] = os.path.abspath(source)
+                    ds.attrs['source'] = os.path.abspath(source_str)
                     return ds
                 else:
-                    return _im7_to_dataset(source, t=t)
+                    return _im7_to_dataset(source_str, t=t)
             except Exception as e:
-                raise ValueError(f"Unable to parse '{source}' as PIV dataset: {e}")
+                raise ValueError(f"Unable to parse '{source_str}' as PIV dataset: {e}")
 
     # If already a buffer
     if hasattr(source, 'image_sub_type'):
@@ -117,32 +191,16 @@ def to_dataset(
     raise TypeError(f"Unsupported source type: {type(source)}")
 
 
-def _extract_dt(attributes: Dict[str, Any]) -> Optional[float]:
-    """Extract pulse separation dt in seconds from DaVis attributes."""
-    for key in ('FrameDt0', 'DevDataScaleI2', '_PULSE_SEPARATION_US', 'dt'):
-        val = attributes.get(key)
-        if val is not None:
-            val_str = str(val).strip()
-            # E.g. "10000 us" or "10 ms" or "0.01"
-            parts = val_str.split()
-            try:
-                num = float(parts[0])
-                if len(parts) > 1:
-                    unit = parts[1].lower()
-                    if 'us' in unit or 'µs' in unit:
-                        return num * 1e-6
-                    elif 'ms' in unit:
-                        return num * 1e-3
-                    elif 'ns' in unit:
-                        return num * 1e-9
-                return num
-            except (ValueError, IndexError):
-                pass
-    return None
+def _vectorfield_to_dataset(vf: VectorField, t: Optional[Union[float, int]] = None) -> xr.Dataset:
+    """Build an xarray.Dataset from a VectorField matching PIVPy standards."""
+    parsed_meta = parse_davis_attributes(vf.attributes)
 
+    dt = parsed_meta.get('delta_t')
+    if dt is None:
+        dt = 0.0
 
-def _vectorfield_to_dataset(vf: VectorField, t: Optional[Union[float, int]] = 0) -> xr.Dataset:
-    """Build an xarray.Dataset from a VectorField."""
+    t_val = 0.0 if t is None else float(t)
+
     coords = {
         'y': ('y', vf.y),
         'x': ('x', vf.x),
@@ -165,36 +223,51 @@ def _vectorfield_to_dataset(vf: VectorField, t: Optional[Union[float, int]] = 0)
 
     data_vars['mask'] = (dims, vf.mask.astype(np.int8))
 
-    dt = _extract_dt(vf.attributes)
-
     attrs = {
-        'units': [vf.units['x'], vf.units['y'], vf.units['u'], vf.units['v']],
         'variables': ['x', 'y', 'u', 'v'] + (['w'] if vf.w is not None else []),
+        'units': [vf.units['x'], vf.units['y'], vf.units['u'], vf.units['v']],
+        'delta_t': dt,
+        'dt': dt,
         'vector_grid': vf.vector_grid,
         'is_3d': vf.is_3d,
         'extent': vf.extent,
     }
 
-    if dt is not None:
-        attrs['dt'] = dt
+    if parsed_meta.get('date'):
+        attrs['date'] = parsed_meta['date']
+    if parsed_meta.get('time'):
+        attrs['time'] = parsed_meta['time']
+    if parsed_meta.get('davis_version'):
+        attrs['davis_version'] = parsed_meta['davis_version']
 
-    # Include raw attributes
+    # Include raw attributes prefixed with 'davis_'
     for k, v in vf.attributes.items():
         if isinstance(v, (str, int, float, bool)):
             attrs[f'davis_{k}'] = v
 
     ds = xr.Dataset(data_vars=data_vars, coords=coords, attrs=attrs)
 
-    if t is not None:
-        ds = ds.expand_dims(dim={'t': [t]})
+    # Set variable and coordinate units
+    ds['x'].attrs['units'] = vf.units['x']
+    ds['y'].attrs['units'] = vf.units['y']
+    ds['u'].attrs['units'] = vf.units['u']
+    ds['v'].attrs['units'] = vf.units['v']
+    if vf.w is not None:
+        ds['w'].attrs['units'] = vf.units.get('w', vf.units['u'])
+
+    # Expand dims along time dimension t
+    ds = ds.expand_dims(dim={'t': [t_val]})
 
     return ds
 
 
-def _im7_to_dataset(filename: str, t: Optional[Union[float, int]] = 0) -> xr.Dataset:
+def _im7_to_dataset(filename: str, t: Optional[Union[float, int]] = None) -> xr.Dataset:
     """Convert an IM7 image file to an xarray.Dataset."""
     buff, atts = extra.get_Buffer_andAttributeList(filename)
     arr, _ = extra.buffer_as_array(buff)  # (components, ny, nx)
+
+    parsed_meta = parse_davis_attributes(atts)
+    dt = parsed_meta.get('delta_t', 0.0)
 
     ny, nx = buff.ny, buff.nx
     fx = getattr(buff.scaleX, 'factor', 1.0)
@@ -205,13 +278,16 @@ def _im7_to_dataset(filename: str, t: Optional[Union[float, int]] = 0) -> xr.Dat
     x = (np.arange(nx) + 0.5) * fx + ox
     y = (np.arange(ny) + 0.5) * fy + oy
 
-    # If multiple frames (e.g. pulse A and pulse B)
     nf = arr.shape[0]
     frame_coords = np.arange(nf)
 
     data_vars = {
         'intensity': (('frame', 'y', 'x'), arr),
     }
+
+    if nf == 2:
+        data_vars['pulse_a'] = (('y', 'x'), arr[0])
+        data_vars['pulse_b'] = (('y', 'x'), arr[1])
 
     if buff.mask is not None:
         data_vars['mask'] = (('frame', 'y', 'x'), buff.mask.astype(np.int8))
@@ -225,16 +301,19 @@ def _im7_to_dataset(filename: str, t: Optional[Union[float, int]] = 0) -> xr.Dat
     attrs = {
         'source': os.path.abspath(filename),
         'units': [getattr(buff.scaleX, 'unit', 'pixel'), getattr(buff.scaleY, 'unit', 'pixel'), getattr(buff.scaleI, 'unit', 'counts')],
+        'delta_t': dt,
+        'dt': dt,
         'nf': nf,
         'is_float': buff.is_float,
     }
+
     for k, v in atts.items():
         if isinstance(v, (str, int, float, bool)):
             attrs[f'davis_{k}'] = v
 
     ds = xr.Dataset(data_vars=data_vars, coords=coords, attrs=attrs)
-    if t is not None:
-        ds = ds.expand_dims(dim={'t': [t]})
+    t_val = 0.0 if t is None else float(t)
+    ds = ds.expand_dims(dim={'t': [t_val]})
     return ds
 
 
@@ -247,7 +326,6 @@ def _ims_to_dataset(source: str, max_pairs: Optional[int] = None) -> xr.Dataset:
     x = np.arange(nx, dtype=np.float32)
     y = np.arange(ny, dtype=np.float32)
 
-    # Read pairs into memory (or chunks)
     data_a = np.empty((n_pairs, ny, nx), dtype=np.uint16)
     data_b = np.empty((n_pairs, ny, nx), dtype=np.uint16)
 
@@ -257,14 +335,14 @@ def _ims_to_dataset(source: str, max_pairs: Optional[int] = None) -> xr.Dataset:
         data_b[i] = pb
 
     coords = {
-        'pair': ('pair', np.arange(n_pairs)),
+        't': ('t', np.arange(n_pairs, dtype=np.float64)),
         'y': ('y', y),
         'x': ('x', x),
     }
 
     data_vars = {
-        'pulse_a': (('pair', 'y', 'x'), data_a),
-        'pulse_b': (('pair', 'y', 'x'), data_b),
+        'pulse_a': (('t', 'y', 'x'), data_a),
+        'pulse_b': (('t', 'y', 'x'), data_b),
     }
 
     attrs = {
@@ -273,30 +351,36 @@ def _ims_to_dataset(source: str, max_pairs: Optional[int] = None) -> xr.Dataset:
         'nx': nx,
         'ny': ny,
         'bits_per_pixel': info.get('bits_per_pixel', 12),
+        'delta_t': 0.0,
+        'dt': 0.0,
     }
 
     return xr.Dataset(data_vars=data_vars, coords=coords, attrs=attrs)
 
 
 def load_sequence(
-    filenames: Sequence[str],
+    source: Union[str, Path, Sequence[Union[str, Path]]],
     t_coords: Optional[Sequence[Union[float, int]]] = None,
     choice_preference: str = "optimal",
     invert_y: bool = True,
+    chunks: Optional[Union[str, Dict[str, int]]] = None,
 ) -> xr.Dataset:
     """
-    Load an ordered list of VC7/IM7 files into a single time-resolved xarray.Dataset.
+    Load an ordered sequence of VC7/IM7 files into a single time-resolved xarray.Dataset.
 
     Parameters
     ----------
-    filenames : list of str
-        List of paths to VC7 or IM7 files.
+    source : list of str/Path | str glob pattern | str directory path
+        File list, glob pattern (e.g. 'data/B*.VC7'), or directory containing files.
     t_coords : list of float/int, optional
-        Custom time coordinates. If None, indices 0, 1, ... are used.
+        Custom time coordinates. If None, automatically derived from acquisition timestamps,
+        delta_t * index, or integer frame indices.
     choice_preference : str
         'optimal' or 'first'.
     invert_y : bool
         Whether to orient y upwards.
+    chunks : dict | str, optional
+        Chunking specification for lazy Dask loading (e.g. {'t': 1} or 'auto').
 
     Returns
     -------
@@ -306,12 +390,37 @@ def load_sequence(
     if not HAS_XARRAY:
         raise ImportError("xarray is required for load_sequence().")
 
-    if not filenames:
-        raise ValueError("filenames sequence must not be empty.")
+    # Resolve input filenames
+    if isinstance(source, (str, Path)):
+        source_str = str(source)
+        if os.path.isdir(source_str):
+            # Find all .vc7 or .im7 in directory
+            files = [
+                os.path.join(source_str, f) for f in os.listdir(source_str)
+                if f.lower().endswith(('.vc7', '.vec', '.im7'))
+            ]
+        elif any(c in source_str for c in ('*', '?', '[')):
+            files = glob.glob(source_str)
+        else:
+            files = [source_str]
+    else:
+        files = [str(f) for f in source]
+
+    if not files:
+        raise ValueError(f"No matching files found for source: {source}")
+
+    # Natural alphanumeric sort
+    files.sort(key=_natural_sort_key)
 
     datasets = []
-    for i, fn in enumerate(filenames):
-        t_val = t_coords[i] if t_coords is not None else i
+    current_time = 0.0
+
+    for i, fn in enumerate(files):
+        if t_coords is not None:
+            t_val = t_coords[i]
+        else:
+            t_val = float(i)
+
         ds = to_dataset(
             fn,
             t=t_val,
@@ -320,7 +429,16 @@ def load_sequence(
         )
         datasets.append(ds)
 
-    combined = xr.concat(datasets, dim='t')
+    combined = xr.concat(datasets, dim='t', join='outer')
+
+    # Apply Dask chunking if requested
+    if chunks is not None:
+        try:
+            import dask
+            combined = combined.chunk(chunks)
+        except ImportError:
+            pass
+
     return combined
 
 

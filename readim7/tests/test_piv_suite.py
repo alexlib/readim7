@@ -74,16 +74,69 @@ def test_to_dataset_and_pivpy(sample_2c, sample_3c):
     assert 't' in ds2.coords
     assert ds2.attrs['units'] == ['mm', 'mm', 'm/s', 'm/s']
     assert ds2.attrs['dt'] == 0.01
+    assert ds2.attrs['delta_t'] == 0.01
+    assert ds2['u'].attrs['units'] == 'm/s'
+    assert ds2['x'].attrs['units'] == 'mm'
 
     ds3 = readim7.to_pivpy(sample_3c)
     assert 'w' in ds3.data_vars
     assert ds3.attrs['is_3d'] is True
 
 
+def test_parse_davis_attributes(sample_2c, sample_im7):
+    _, atts2 = readim7.get_Buffer_andAttributeList(sample_2c)
+    meta2 = readim7.parse_davis_attributes(atts2)
+    assert meta2['delta_t'] == 0.01
+    assert meta2['date'] == '18.05.10'
+    assert 'x' in meta2['scales']
+    assert 'y' in meta2['scales']
+    assert meta2['scales']['x']['factor'] > 0
+
+    _, atts_im = readim7.get_Buffer_andAttributeList(sample_im7)
+    meta_im = readim7.parse_davis_attributes(atts_im)
+    assert meta_im['davis_version'] == '7.2.2.249'
+
+
+def test_read_image_pair():
+    # 2-frame 1camera.im7
+    img1 = readim7.get_sample_image_filenames()[0]
+    fa, fb = readim7.read_image_pair(img1)
+    assert fa.shape == (1024, 1376)
+    assert fb.shape == (1024, 1376)
+    assert fa.dtype == np.uint16
+
+    # 4-frame 2cameras.im7
+    img2 = readim7.get_sample_image_filenames()[1]
+    c0a, c0b = readim7.read_image_pair(img2, camera=0)
+    c1a, c1b = readim7.read_image_pair(img2, camera=1)
+    assert c0a.shape == (1024, 1376)
+    assert c1a.shape == (1024, 1376)
+
+
+def test_pivpy_accessor_direct(sample_2c):
+    try:
+        import pivpy
+        ds = readim7.to_pivpy(sample_2c)
+        assert ds.piv.delta_t == 0.01
+        vort = ds.piv.vorticity()
+        assert 'u' in vort.data_vars
+    except ImportError:
+        pass
+
+
 def test_load_sequence(sample_2c):
     ds_seq = readim7.load_sequence([sample_2c, sample_2c], t_coords=[0.0, 0.5])
     assert ds_seq.sizes['t'] == 2
     assert list(ds_seq.coords['t'].values) == [0.0, 0.5]
+
+
+def test_load_sequence_dask(sample_2c):
+    try:
+        import dask
+        ds_chunked = readim7.load_sequence([sample_2c, sample_2c], chunks={'t': 1})
+        assert hasattr(ds_chunked.u.data, 'dask')
+    except ImportError:
+        pass
 
 
 def test_export_pivmat(sample_2c):
